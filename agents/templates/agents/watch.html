@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% load agent_tags %}
+
+{% block title %}Running Pipeline — CRM Bank{% endblock %}
+
+{% block content %}
+<section class="watch-section">
+
+    <div class="watch-header">
+        <h1>Pipeline Running…</h1>
+        <p class="subtitle">
+            Decision method: <strong>{{ run.get_decision_method_display }}</strong>
+            &nbsp;·&nbsp; Run ID: <code>{{ run.run_id|stringformat:"s"|slice:":8" }}…</code>
+        </p>
+    </div>
+
+    <!-- Overall progress bar -->
+    <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+        <span class="progress-label" id="progress-label">Initialising…</span>
+    </div>
+
+    <!-- Stage cards (one per agent) -->
+    <div class="stages-grid" id="stages-grid">
+        {% for stage_id in stage_order %}
+        <div class="stage-watch-card" id="card-{{ stage_id }}" data-stage="{{ stage_id }}">
+            <div class="swc-header">
+                <span class="swc-icon">{{ stage_icons|lookup:stage_id }}</span>
+                <span class="swc-title">{{ stage_labels|lookup:stage_id }}</span>
+                <span class="swc-status pending" id="status-{{ stage_id }}">⏳ Pending</span>
+            </div>
+
+            <!-- Token stream: LLM output appears here token-by-token -->
+            <div class="token-stream" id="tokens-{{ stage_id }}">
+                <span class="token-placeholder">Waiting for agent…</span>
+            </div>
+
+            <!-- Summary shown after stage completes -->
+            <div class="swc-summary hidden" id="summary-{{ stage_id }}"></div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Done banner (hidden until pipeline finishes) -->
+    <div class="done-banner hidden" id="done-banner">
+        <div class="done-icon">✅</div>
+        <div class="done-text">
+            <strong>Pipeline Complete!</strong>
+            <span id="done-summary"></span>
+        </div>
+        <a id="view-results-btn" href="#" class="btn btn-primary">View Full Results →</a>
+    </div>
+
+    <!-- Error banner -->
+    <div class="error-banner hidden" id="error-banner">
+        <div class="error-icon">❌</div>
+        <div class="error-text">
+            <strong>Pipeline Failed</strong>
+            <pre id="error-detail"></pre>
+        </div>
+    </div>
+
+</section>
+
+<script>
+const RUN_ID   = "{{ run.run_id }}";
+const STREAM_URL = "{% url 'agents:stream_run' run.run_id %}";
+const DETAIL_URL = "{% url 'agents:run_detail' run.run_id %}";
+const STAGES   = {{ stage_order|to_json }};
+
+const progressMap = {
+    sql_agent: 25,
+    decision_agent: 50,
+    recommendation_agent: 75,
+    message_agent: 100,
+};
+
+const stageLabels = {{ stage_labels|to_json }};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function setProgress(pct, label) {
+    document.getElementById('progress-bar').style.width = pct + '%';
+    document.getElementById('progress-label').textContent = label;
+}
+
+function setStatus(stage, statusHtml, cls) {
+    const el = document.getElementById('status-' + stage);
+    if (!el) return;
+    el.className = 'swc-status ' + cls;
+    el.innerHTML = statusHtml;
+}
+
+function appendToken(stage, token) {
+    const box = document.getElementById('tokens-' + stage);
+    if (!box) return;
+    // Clear placeholder on first token
+    const ph = box.querySelector('.token-placeholder');
+    if (ph) ph.remove();
+
+    const span = document.createTextNode(token);
+    box.appendChild(span);
+    box.scrollTop = box.scrollHeight;
+}
+
+function showSummary(stage, html) {
+    const el = document.getElementById('summary-' + stage);
+    if (!el) return;
+    el.innerHTML = html;
+    el.classList.remove('hidden');
+}
+
+function activateCard(stage) {
+    document.querySelectorAll('.stage-watch-card').forEach(c => c.classList.remove('active'));
+    const card = document.getElementById('card-' + stage);
+    if (card) {
+        card.classList.add('active');
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+// ── SSE Connection ────────────────────────────────────────────────────────────
+
+const source = new EventSource(STREAM_URL);
+
+source.onmessage = function(e) {
+    const ev = JSON.parse(e.data);
+
+    if (ev.type === 'init') {
+        setProgress(0, 'Pipeline started — fetching customers…');
+        return;
+    }
+
+    if (ev.type === 'stage_start') {
+        const stage = ev.node;
+        activateCard(stage);
+        setStatus(stage, '🔄 Running…', 'running');
+        setProgress(
+            (progressMap[stage] || 0) - 12,
+            stageLabels[stage] + ' is running…'
+        );
+        // Clear old placeholder
+        const ph = document.querySelector('#tokens-' + stage + ' .token-placeholder');
+        if (ph) ph.textContent = 'LLM is thinking…';
+        return;
+    }
+
+    if (ev.type === 'token') {
+        appendToken(ev.node, ev.content);
+        return;
+    }
+
+    if (ev.type === 'stage_done') {
+        const stage = ev.node;
+        setStatus(stage, '✅ Done', 'done');
+        setProgress(progressMap[stage] || 0, ev.label + ': ' + ev.count_label);
+        showSummary(stage,
+            `<span class="swc-count">${ev.count_label}</span>`
+        );
+        document.getElementById('card-' + stage).classList.remove('active');
+        document.getElementById('card-' + stage).classList.add('completed');
+        return;
+    }
+
+    if (ev.type === 'done') {
+        source.close();
+        setProgress(100, 'All agents completed successfully!');
+        document.getElementById('done-summary').textContent =
+            ` — ${ev.total_fetched} fetched, ${ev.total_scored} scored, ${ev.total_messages} messages generated.`;
+        document.getElementById('view-results-btn').href = DETAIL_URL;
+        document.getElementById('done-banner').classList.remove('hidden');
+
+        // Auto-redirect after 3 seconds
+        setTimeout(() => { window.location.href = DETAIL_URL; }, 3000);
+        return;
+    }
+
+    if (ev.type === 'error') {
+        source.close();
+        setProgress(0, 'Pipeline failed');
+        document.getElementById('error-detail').textContent =
+            ev.message + '\n\n' + (ev.detail || '');
+        document.getElementById('error-banner').classList.remove('hidden');
+        return;
+    }
+};
+
+source.onerror = function() {
+    // Only show error if we haven't already shown a done/error banner
+    if (!document.getElementById('done-banner').classList.contains('hidden')) return;
+    if (!document.getElementById('error-banner').classList.contains('hidden')) return;
+    source.close();
+    document.getElementById('error-detail').textContent =
+        'Lost connection to server. The pipeline may still be running — check Run History.';
+    document.getElementById('error-banner').classList.remove('hidden');
+};
+</script>
+{% endblock %}

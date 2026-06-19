@@ -7,7 +7,7 @@
 
     <div class="section-header">
         <h1>Agent Pipeline</h1>
-        <p class="subtitle">Select a decision method and trigger the four-agent pipeline to identify loan candidates.</p>
+        <!-- <p class="subtitle">Select a decision method and trigger the four-agent pipeline to identify loan candidates.</p> -->
     </div>
 
     <!-- Pipeline trigger card -->
@@ -63,10 +63,10 @@
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-run" id="run-btn" onclick="onRunClick()">
+            <button type="submit" class="btn btn-primary btn-run" id="run-btn" onclick="this.textContent='Starting…'; this.disabled=true;">
                 ▶ Run Agent Pipeline
             </button>
-            <p class="run-note">Pipeline runs synchronously — this may take 15–30 seconds.</p>
+            <p class="run-note">You will be taken to a live progress view where you can watch each agent run in real-time.</p>
         </form>
     </div>
 
@@ -113,11 +113,6 @@
 function selectMethod(value) {
     document.querySelectorAll('.method-radio').forEach(el => el.classList.remove('selected'));
     document.getElementById('label-' + value).classList.add('selected');
-}
-function onRunClick() {
-    const btn = document.getElementById('run-btn');
-    btn.textContent = '⏳ Running pipeline…';
-    btn.disabled = true;
 }
 </script>
 {% endblock %}
