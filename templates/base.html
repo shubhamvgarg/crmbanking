@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CRM Bank{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="{% url 'rm_auth:dashboard' %}" class="brand">CRM Bank</a>
+            {% if request.session.rm_user_id %}
+            <nav class="nav">
+                <a href="{% url 'rm_auth:dashboard' %}">Dashboard</a>
+                <a href="{% url 'rm_auth:change_password' %}">Change Password</a>
+                <form method="post" action="{% url 'rm_auth:logout' %}" class="inline-form">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-link">Logout</button>
+                </form>
+            </nav>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="container main-content">
+        {% if messages %}
+        <ul class="messages">
+            {% for message in messages %}
+            <li class="message message-{{ message.tags }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

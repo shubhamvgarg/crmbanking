@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}RM Login — CRM Bank{% endblock %}
+
+{% block content %}
+<section class="auth-card">
+    <h1>Relationship Manager Login</h1>
+    <p class="subtitle">Sign in with your User ID and password.</p>
+
+    <form method="post" class="form">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <p class="field-error">{{ field.errors.0 }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% if form.non_field_errors %}
+        <p class="field-error">{{ form.non_field_errors.0 }}</p>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">Login</button>
+    </form>
+</section>
+{% endblock %}

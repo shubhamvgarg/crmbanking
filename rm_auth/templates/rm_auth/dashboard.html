@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — CRM Bank{% endblock %}
+
+{% block content %}
+<section class="dashboard">
+    <div class="dashboard-header">
+        <h1>RM Dashboard</h1>
+        <p class="subtitle">Welcome, <strong>{{ rm_user.user_id }}</strong></p>
+    </div>
+
+    <div class="placeholder-card">
+        <h2>Agent pipeline coming soon</h2>
+        <p>
+            Phase 1 is complete. This dashboard will host the agent pipeline trigger,
+            decision method selector, and human-in-the-loop review in upcoming phases.
+        </p>
+        <dl class="meta-list">
+            <dt>Email</dt>
+            <dd>{{ rm_user.email }}</dd>
+            <dt>Account status</dt>
+            <dd>{% if rm_user.is_active %}Active{% else %}Inactive{% endif %}</dd>
+            <dt>Member since</dt>
+            <dd>{{ rm_user.created_at|date:"M j, Y" }}</dd>
+        </dl>
+    </div>
+</section>
+{% endblock %}
