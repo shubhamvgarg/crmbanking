@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Run {{ run.run_id|stringformat:"s"|slice:":8" }} — CRM Bank{% endblock %}
+
+{% block content %}
+<section class="run-detail">
+    <div class="back-link">
+        <a href="{% url 'agents:dashboard' %}">← Back to pipeline</a>
+    </div>
+
+    <div class="run-header">
+        <h1>Pipeline Run Results</h1>
+        <div class="run-meta">
+            <span class="tag tag-status-{{ run.status }}">{{ run.get_status_display }}</span>
+            <span class="meta-pill">{{ run.get_decision_method_display }}</span>
+            <span class="meta-pill">Started {{ run.started_at|date:"M j, Y H:i" }}</span>
+            {% if run.completed_at %}
+            <span class="meta-pill">Completed {{ run.completed_at|date:"H:i:s" }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Summary counters -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-number">{{ run.raw_users|length }}</div>
+            <div class="stat-label">Customers Fetched</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ run.scored_users|length }}</div>
+            <div class="stat-label">Candidates Scored</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ run.recommended_users|length }}</div>
+            <div class="stat-label">Offers Recommended</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ run.generated_messages|length }}</div>
+            <div class="stat-label">Messages Generated</div>
+        </div>
+    </div>
+
+    {% if run.status == 'failed' and run.errors %}
+    <div class="error-box">
+        <h2>Pipeline Error</h2>
+        <pre>{{ run.errors.0 }}</pre>
+    </div>
+    {% endif %}
+
+    <!-- Stage 1: SQL Agent -->
+    <details class="stage-card" open>
+        <summary class="stage-header">
+            <span class="stage-badge">1</span>
+            SQL Agent — {{ run.raw_users|length }} customers fetched
+        </summary>
+        {% if run.sql_agent_log %}
+        <div class="agent-log"><strong>Agent reasoning:</strong> {{ run.sql_agent_log }}</div>
+        {% endif %}
+        {% if run.raw_users %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th><th>Name</th><th>Salary (₹)</th><th>Tenure (mo)</th>
+                        <th>Repayment</th><th>Credit Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in run.raw_users|slice:":20" %}
+                    <tr>
+                        <td><code>{{ u.customer_id }}</code></td>
+                        <td>{{ u.name }}</td>
+                        <td>{{ u.salary|floatformat:0 }}</td>
+                        <td>{{ u.relationship_tenure_months }}</td>
+                        <td><span class="tag tag-{{ u.repayment_behavior }}">{{ u.repayment_behavior }}</span></td>
+                        <td>{{ u.credit_score|default:"N/A" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if run.raw_users|length > 20 %}
+        <p class="empty-state">Showing first 20 of {{ run.raw_users|length }} customers.</p>
+        {% endif %}
+        {% endif %}
+    </details>
+
+    <!-- Stage 2: Decision Agent -->
+    <details class="stage-card" open>
+        <summary class="stage-header">
+            <span class="stage-badge">2</span>
+            Decision Agent — {{ run.scored_users|length }} candidates ({{ run.get_decision_method_display }})
+        </summary>
+        {% if run.decision_agent_log %}
+        <div class="agent-log"><strong>Agent reasoning:</strong> {{ run.decision_agent_log }}</div>
+        {% endif %}
+        {% if run.scored_users %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th><th>Name</th><th>Score</th><th>Reasoning</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in run.scored_users %}
+                    <tr>
+                        <td><code>{{ u.customer_id }}</code></td>
+                        <td>{{ u.name }}</td>
+                        <td>
+                            <div class="score-bar-wrap">
+                                <div class="score-bar" style="width:{{ u.conversion_score|floatformat:2|default:'0' }}00%"></div>
+                                <span>{{ u.conversion_score }}</span>
+                            </div>
+                        </td>
+                        <td class="reason-cell">{{ u.scoring_reason }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="empty-state">No candidates identified with this method.</p>
+        {% endif %}
+    </details>
+
+    <!-- Stage 3: Recommendation Agent -->
+    <details class="stage-card" open>
+        <summary class="stage-header">
+            <span class="stage-badge">3</span>
+            Recommendation Agent — {{ run.recommended_users|length }} offers assigned
+        </summary>
+        {% if run.recommendation_agent_log %}
+        <div class="agent-log"><strong>Agent reasoning:</strong> {{ run.recommendation_agent_log }}</div>
+        {% endif %}
+        {% if run.recommended_users %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th><th>Name</th><th>Recommended Offer</th>
+                        <th>Amount Range</th><th>Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in run.recommended_users %}
+                    <tr>
+                        <td><code>{{ u.customer_id }}</code></td>
+                        <td>{{ u.name }}</td>
+                        <td><span class="offer-badge">{{ u.recommended_offer }}</span></td>
+                        <td>{{ u.offer_details.amount_range }}</td>
+                        <td>{{ u.offer_details.interest_rate }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </details>
+
+    <!-- Stage 4: Message Agent -->
+    <details class="stage-card" open>
+        <summary class="stage-header">
+            <span class="stage-badge">4</span>
+            Message Agent — {{ run.generated_messages|length }} messages generated
+        </summary>
+        {% if run.message_agent_log %}
+        <div class="agent-log"><strong>Agent reasoning:</strong> {{ run.message_agent_log }}</div>
+        {% endif %}
+        {% if run.generated_messages %}
+        <div class="messages-grid">
+            {% for msg in run.generated_messages %}
+            <div class="message-bubble">
+                <div class="msg-meta">
+                    <strong>{{ msg.name }}</strong>
+                    <span class="msg-offer">{{ msg.offer }}</span>
+                </div>
+                <div class="msg-number">{{ msg.whatsapp_number }}</div>
+                <div class="msg-body">{{ msg.message }}</div>
+                <div class="msg-status {% if msg.queued %}queued{% endif %}">
+                    {% if msg.queued %}✓ Queued{% else %}○ Stub (Phase 5 will queue via RabbitMQ){% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </details>
+
+</section>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Pipeline — CRM Bank{% endblock %}
+
+{% block content %}
+<section class="agent-dashboard">
+
+    <div class="section-header">
+        <h1>Agent Pipeline</h1>
+        <p class="subtitle">Select a decision method and trigger the four-agent pipeline to identify loan candidates.</p>
+    </div>
+
+    <!-- Pipeline trigger card -->
+    <div class="pipeline-card">
+        <h2>Run Pipeline</h2>
+        <form method="post" action="{% url 'agents:trigger_run' %}" id="pipeline-form">
+            {% csrf_token %}
+
+            <p class="method-label">Select Decision Method <span class="required">*</span></p>
+            <div class="method-options">
+                {% for value, label in decision_methods %}
+                <label class="method-radio {% if value == 'rule_based' %}selected{% endif %}" id="label-{{ value }}">
+                    <input
+                        type="radio"
+                        name="decision_method"
+                        value="{{ value }}"
+                        {% if value == 'rule_based' %}checked{% endif %}
+                        onchange="selectMethod('{{ value }}')"
+                    >
+                    <span class="method-title">{{ label }}</span>
+                    <span class="method-desc">
+                        {% if value == 'rule_based' %}Rules: large txn, salary, tenure, repayment{% endif %}
+                        {% if value == 'heuristics' %}Smart: CC usage, EMI history, income{% endif %}
+                        {% if value == 'ml' %}ML: Logistic Regression on customer features{% endif %}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+
+            <div class="pipeline-flow">
+                <div class="flow-step">
+                    <span class="step-icon">🗄</span>
+                    <span class="step-label">SQL Agent</span>
+                    <span class="step-sub">Fetch 100 users</span>
+                </div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">
+                    <span class="step-icon">🔍</span>
+                    <span class="step-label">Decision Agent</span>
+                    <span class="step-sub">Score candidates</span>
+                </div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">
+                    <span class="step-icon">💡</span>
+                    <span class="step-label">Recommendation</span>
+                    <span class="step-sub">Map offers</span>
+                </div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-step">
+                    <span class="step-icon">✉</span>
+                    <span class="step-label">Message Agent</span>
+                    <span class="step-sub">Generate messages</span>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-run" id="run-btn" onclick="onRunClick()">
+                ▶ Run Agent Pipeline
+            </button>
+            <p class="run-note">Pipeline runs synchronously — this may take 15–30 seconds.</p>
+        </form>
+    </div>
+
+    <!-- Recent runs -->
+    {% if recent_runs %}
+    <div class="runs-section">
+        <h2>Recent Runs</h2>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Run ID</th>
+                        <th>Method</th>
+                        <th>Status</th>
+                        <th>Fetched</th>
+                        <th>Scored</th>
+                        <th>Messages</th>
+                        <th>Started</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in recent_runs %}
+                    <tr>
+                        <td><code>{{ run.run_id|stringformat:"s"|slice:":8" }}…</code></td>
+                        <td>{{ run.get_decision_method_display }}</td>
+                        <td><span class="tag tag-status-{{ run.status }}">{{ run.get_status_display }}</span></td>
+                        <td>{{ run.raw_users|length }}</td>
+                        <td>{{ run.scored_users|length }}</td>
+                        <td>{{ run.generated_messages|length }}</td>
+                        <td>{{ run.started_at|date:"M j, H:i" }}</td>
+                        <td><a href="{% url 'agents:run_detail' run.run_id %}" class="btn btn-sm">View</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+</section>
+
+<script>
+function selectMethod(value) {
+    document.querySelectorAll('.method-radio').forEach(el => el.classList.remove('selected'));
+    document.getElementById('label-' + value).classList.add('selected');
+}
+function onRunClick() {
+    const btn = document.getElementById('run-btn');
+    btn.textContent = '⏳ Running pipeline…';
+    btn.disabled = true;
+}
+</script>
+{% endblock %}

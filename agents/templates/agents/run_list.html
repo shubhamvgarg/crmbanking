@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}All Runs — CRM Bank{% endblock %}
+
+{% block content %}
+<section class="customers-section">
+    <div class="section-header">
+        <h1>Pipeline Run History <span class="badge">{{ runs|length }}</span></h1>
+    </div>
+
+    {% if runs %}
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Run ID</th><th>Method</th><th>Status</th>
+                    <th>Fetched</th><th>Scored</th><th>Messages</th>
+                    <th>Started</th><th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for run in runs %}
+                <tr>
+                    <td><code>{{ run.run_id|stringformat:"s"|slice:":8" }}…</code></td>
+                    <td>{{ run.get_decision_method_display }}</td>
+                    <td><span class="tag tag-status-{{ run.status }}">{{ run.get_status_display }}</span></td>
+                    <td>{{ run.raw_users|length }}</td>
+                    <td>{{ run.scored_users|length }}</td>
+                    <td>{{ run.generated_messages|length }}</td>
+                    <td>{{ run.started_at|date:"M j, Y H:i" }}</td>
+                    <td><a href="{% url 'agents:run_detail' run.run_id %}" class="btn btn-sm">View</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty-state">No pipeline runs yet. Go to <a href="{% url 'agents:dashboard' %}">Agent Pipeline</a> to start one.</p>
+    {% endif %}
+</section>
+{% endblock %}
