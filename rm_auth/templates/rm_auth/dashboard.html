@@ -10,11 +10,6 @@
     </div>
 
     <div class="placeholder-card">
-        <h2>Agent pipeline coming soon</h2>
-        <p>
-            Phase 1 is complete. This dashboard will host the agent pipeline trigger,
-            decision method selector, and human-in-the-loop review in upcoming phases.
-        </p>
         <dl class="meta-list">
             <dt>Email</dt>
             <dd>{{ rm_user.email }}</dd>
@@ -23,6 +18,11 @@
             <dt>Member since</dt>
             <dd>{{ rm_user.created_at|date:"M j, Y" }}</dd>
         </dl>
+        <div class="dashboard-actions">
+            <a href="{% url 'agents:dashboard' %}" class="btn btn-primary">▶ Run Agent Pipeline</a>
+            <a href="{% url 'customers:list' %}" class="btn btn-secondary">Browse Customers</a>
+            <a href="{% url 'agents:run_list' %}" class="btn btn-secondary">View Run History</a>
+        </div>
     </div>
 </section>
 {% endblock %}
