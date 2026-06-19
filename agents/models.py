@@ -28,6 +28,7 @@ STAGE_CHOICES = [
 
 class AgentRun(models.Model):
     run_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
     triggered_by = models.ForeignKey(
         RMUser,
         on_delete=models.SET_NULL,
@@ -63,3 +64,52 @@ class AgentRun(models.Model):
 
     def __str__(self):
         return f"Run {str(self.run_id)[:8]} — {self.get_decision_method_display()} — {self.get_status_display()}"
+
+
+REVIEW_STAGES = [
+    ("sql_agent", "SQL Agent"),
+    ("decision_agent", "Decision Agent"),
+    ("recommendation_agent", "Recommendation Agent"),
+    ("message_agent", "Message Agent"),
+]
+
+
+class HumanReview(models.Model):
+    run = models.ForeignKey(
+        AgentRun,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+    stage = models.CharField(max_length=30, choices=REVIEW_STAGES)
+    batch_offset = models.IntegerField(default=0)
+
+    original_data = models.JSONField(
+        default=list,
+        help_text="Full agent output before RM review",
+    )
+    approved_data = models.JSONField(
+        default=list,
+        help_text="Entries approved (and optionally edited) by RM",
+    )
+    removed_ids = models.JSONField(
+        default=list,
+        help_text="customer_ids removed by RM",
+    )
+
+    reviewed_by = models.ForeignKey(
+        RMUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="reviews",
+    )
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Human Review"
+        verbose_name_plural = "Human Reviews"
+        ordering = ["reviewed_at"]
+        unique_together = [("run", "stage", "batch_offset")]
+
+    def __str__(self):
+        short = str(self.run.run_id)[:8] if self.run_id else "?"
+        return f"Review — {short} / {self.stage} / batch {self.batch_offset}"

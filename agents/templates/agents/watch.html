@@ -1,16 +1,17 @@
 {% extends "base.html" %}
 {% load agent_tags %}
 
-{% block title %}Running Pipeline — CRM Bank{% endblock %}
+{% block title %}Pipeline — CRM Bank{% endblock %}
 
 {% block content %}
 <section class="watch-section">
 
     <div class="watch-header">
-        <h1>Pipeline Running…</h1>
+        <h1 id="watch-heading">Pipeline Running…</h1>
         <p class="subtitle">
             Decision method: <strong>{{ run.get_decision_method_display }}</strong>
             &nbsp;·&nbsp; Run ID: <code>{{ run.run_id|stringformat:"s"|slice:":8" }}…</code>
+            &nbsp;·&nbsp; Batch offset: <strong id="batch-offset-label">{{ run.batch_offset }}</strong>
         </p>
     </div>
 
@@ -29,19 +30,25 @@
                 <span class="swc-title">{{ stage_labels|lookup:stage_id }}</span>
                 <span class="swc-status pending" id="status-{{ stage_id }}">⏳ Pending</span>
             </div>
-
-            <!-- Token stream: LLM output appears here token-by-token -->
             <div class="token-stream" id="tokens-{{ stage_id }}">
                 <span class="token-placeholder">Waiting for agent…</span>
             </div>
-
-            <!-- Summary shown after stage completes -->
             <div class="swc-summary hidden" id="summary-{{ stage_id }}"></div>
         </div>
         {% endfor %}
     </div>
 
-    <!-- Done banner (hidden until pipeline finishes) -->
+    <!-- Review banner (hidden until a stage needs RM review) -->
+    <div class="review-banner hidden" id="review-banner">
+        <div class="review-banner-icon">🧑‍💼</div>
+        <div class="review-banner-text">
+            <strong id="review-banner-title">RM Review Required</strong>
+            <span id="review-banner-desc"></span>
+        </div>
+        <a id="review-btn" href="#" class="btn btn-primary">Go to Review →</a>
+    </div>
+
+    <!-- Done banner -->
     <div class="done-banner hidden" id="done-banner">
         <div class="done-icon">✅</div>
         <div class="done-text">
@@ -62,20 +69,21 @@
 
 </section>
 
+{{ stage_order|json_script:"stage-order-json" }}
+{{ stage_labels|json_script:"stage-labels-json" }}
+
 <script>
-const RUN_ID   = "{{ run.run_id }}";
 const STREAM_URL = "{% url 'agents:stream_run' run.run_id %}";
 const DETAIL_URL = "{% url 'agents:run_detail' run.run_id %}";
-const STAGES   = {{ stage_order|to_json }};
+const STAGES = JSON.parse(document.getElementById('stage-order-json').textContent);
+const stageLabels = JSON.parse(document.getElementById('stage-labels-json').textContent);
 
 const progressMap = {
     sql_agent: 25,
     decision_agent: 50,
     recommendation_agent: 75,
-    message_agent: 100,
+    message_agent: 10,
 };
-
-const stageLabels = {{ stage_labels|to_json }};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -94,12 +102,9 @@ function setStatus(stage, statusHtml, cls) {
 function appendToken(stage, token) {
     const box = document.getElementById('tokens-' + stage);
     if (!box) return;
-    // Clear placeholder on first token
     const ph = box.querySelector('.token-placeholder');
     if (ph) ph.remove();
-
-    const span = document.createTextNode(token);
-    box.appendChild(span);
+    box.appendChild(document.createTextNode(token));
     box.scrollTop = box.scrollHeight;
 }
 
@@ -119,18 +124,53 @@ function activateCard(stage) {
     }
 }
 
-// ── SSE Connection ────────────────────────────────────────────────────────────
+function markDone(stage, countLabel) {
+    setStatus(stage, '✅ Done', 'done');
+    showSummary(stage, `<span class="swc-count">${countLabel}</span>`);
+    const card = document.getElementById('card-' + stage);
+    if (card) {
+        card.classList.remove('active');
+        card.classList.add('completed');
+    }
+}
+
+// ── SSE connection ────────────────────────────────────────────────────────────
 
 const source = new EventSource(STREAM_URL);
 
 source.onmessage = function(e) {
     const ev = JSON.parse(e.data);
 
+    // ── Fresh batch start ─────────────────────────────────────────────────────
     if (ev.type === 'init') {
+        if (ev.batch_offset) {
+            document.getElementById('batch-offset-label').textContent = ev.batch_offset;
+            document.getElementById('watch-heading').textContent = `Pipeline Running — Batch ${ev.batch_offset}…`;
+        }
         setProgress(0, 'Pipeline started — fetching customers…');
         return;
     }
 
+    // ── Resuming after a review — pre-mark completed stages ──────────────────
+    if (ev.type === 'resume') {
+        setProgress(0, 'Resuming pipeline after review…');
+        (ev.completed || []).forEach(info => {
+            const st = info.node;
+            setProgress(progressMap[st] || 0, stageLabels[st] + ': ' + info.count_label);
+            markDone(st, info.count_label);
+            // Populate the token stream with the log if available
+            if (info.log) {
+                const box = document.getElementById('tokens-' + st);
+                if (box) {
+                    box.innerHTML = '';
+                    box.appendChild(document.createTextNode(info.log));
+                }
+            }
+        });
+        return;
+    }
+
+    // ── Stage starting ────────────────────────────────────────────────────────
     if (ev.type === 'stage_start') {
         const stage = ev.node;
         activateCard(stage);
@@ -139,42 +179,60 @@ source.onmessage = function(e) {
             (progressMap[stage] || 0) - 12,
             stageLabels[stage] + ' is running…'
         );
-        // Clear old placeholder
         const ph = document.querySelector('#tokens-' + stage + ' .token-placeholder');
         if (ph) ph.textContent = 'LLM is thinking…';
         return;
     }
 
+    // ── LLM token ─────────────────────────────────────────────────────────────
     if (ev.type === 'token') {
         appendToken(ev.node, ev.content);
         return;
     }
 
+    // ── Stage completed ───────────────────────────────────────────────────────
     if (ev.type === 'stage_done') {
         const stage = ev.node;
-        setStatus(stage, '✅ Done', 'done');
         setProgress(progressMap[stage] || 0, ev.label + ': ' + ev.count_label);
-        showSummary(stage,
-            `<span class="swc-count">${ev.count_label}</span>`
-        );
-        document.getElementById('card-' + stage).classList.remove('active');
-        document.getElementById('card-' + stage).classList.add('completed');
+        markDone(stage, ev.count_label);
         return;
     }
 
+    // ── RM review required ────────────────────────────────────────────────────
+    if (ev.type === 'review_needed') {
+        source.close();
+        setProgress(
+            progressMap[ev.stage] || 0,
+            'Awaiting RM review: ' + (stageLabels[ev.stage] || ev.stage)
+        );
+        // Mark the stage as "awaiting review"
+        setStatus(ev.stage, '🧑‍💼 Review Required', 'review');
+
+        const desc = `${ev.count} entries from <strong>${stageLabels[ev.stage] || ev.stage}</strong> are ready for your review.`
+            + (ev.has_next_batch ? ` After approval the pipeline will continue with batch offset ${ev.next_batch_offset}.` : '');
+        document.getElementById('review-banner-title').textContent = 'RM Review Required — ' + (stageLabels[ev.stage] || ev.stage);
+        document.getElementById('review-banner-desc').innerHTML = desc;
+        document.getElementById('review-btn').href = ev.review_url;
+        document.getElementById('review-banner').classList.remove('hidden');
+
+        // Auto-redirect after 4 seconds
+        setTimeout(() => { window.location.href = ev.review_url; }, 4000);
+        return;
+    }
+
+    // ── Pipeline done (all batches exhausted without separate review) ─────────
     if (ev.type === 'done') {
         source.close();
         setProgress(100, 'All agents completed successfully!');
         document.getElementById('done-summary').textContent =
-            ` — ${ev.total_fetched} fetched, ${ev.total_scored} scored, ${ev.total_messages} messages generated.`;
+            ` — ${ev.total_fetched} fetched, ${ev.total_scored} scored, ${ev.total_messages} messages.`;
         document.getElementById('view-results-btn').href = DETAIL_URL;
         document.getElementById('done-banner').classList.remove('hidden');
-
-        // Auto-redirect after 3 seconds
         setTimeout(() => { window.location.href = DETAIL_URL; }, 3000);
         return;
     }
 
+    // ── Error ─────────────────────────────────────────────────────────────────
     if (ev.type === 'error') {
         source.close();
         setProgress(0, 'Pipeline failed');
@@ -186,12 +244,12 @@ source.onmessage = function(e) {
 };
 
 source.onerror = function() {
-    // Only show error if we haven't already shown a done/error banner
+    if (!document.getElementById('review-banner').classList.contains('hidden')) return;
     if (!document.getElementById('done-banner').classList.contains('hidden')) return;
     if (!document.getElementById('error-banner').classList.contains('hidden')) return;
     source.close();
     document.getElementById('error-detail').textContent =
-        'Lost connection to server. The pipeline may still be running — check Run History.';
+        'Lost connection to server. Check Run History for current status.';
     document.getElementById('error-banner').classList.remove('hidden');
 };
 </script>

@@ -18,6 +18,13 @@
             <span class="meta-pill">Completed {{ run.completed_at|date:"H:i:s" }}</span>
             {% endif %}
         </div>
+        <div class="run-actions">
+            {% if run.status == 'paused' %}
+                <a href="{% url 'agents:continue_run' run.run_id %}" class="btn btn-primary">Continue Paused Run</a>
+            {% elif run.status == 'running' %}
+                <a href="{% url 'agents:watch_run' run.run_id %}" class="btn btn-primary">Watch Running Pipeline</a>
+            {% endif %}
+        </div>
     </div>
 
     <!-- Summary counters -->

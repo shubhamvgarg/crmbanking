@@ -16,9 +16,10 @@ from agents.tools.sql_tool import sql_query_tool
 def sql_agent_node(state: AgentPipelineState, llm) -> dict:
     """
     LangGraph node: fetches a customer batch via sql_query_tool.
-    The LLM is invoked as a ReAct agent that decides to call the tool.
     Returns updated state keys: raw_users, current_stage, sql_agent_log.
     """
+    print("Creating react agent")
+    print(llm)
     agent = create_react_agent(llm, tools=[sql_query_tool])
 
     prompt = (
@@ -40,7 +41,6 @@ def sql_agent_node(state: AgentPipelineState, llm) -> dict:
         except (json.JSONDecodeError, AttributeError):
             raw_users = []
 
-    # Final AI message is the agent's summary
     final_message = result["messages"][-1]
     log = getattr(final_message, "content", str(final_message))
 

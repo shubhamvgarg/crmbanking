@@ -1,14 +1,21 @@
 """
-LangGraph Pipeline
-Linear flow (Phase 3 — no HITL interrupts):
-  START → sql_agent → decision_agent → recommendation_agent → message_agent → END
+LangGraph Pipeline — Phase 4 (HITL enabled)
 
-HITL interrupt nodes will be inserted between each stage in Phase 4.
+Flow with interrupt_before on decision_agent, recommendation_agent, message_agent:
+  START → sql_agent → [INTERRUPT] → decision_agent → [INTERRUPT]
+        → recommendation_agent → [INTERRUPT] → message_agent → END
+
+After message_agent completes the graph finishes (state.next == []).
+The stream_run view detects completion and issues a post-pipeline "message_agent" review.
+
+The MemorySaver checkpointer persists state between the interrupt and resume.
+Thread ID format: "{run_id}_{batch_offset}" — unique per run+batch.
 """
 
 import os
 
 from langchain_groq import ChatGroq
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
 from agents.graph.nodes.decision_agent import decision_agent_node
@@ -17,22 +24,24 @@ from agents.graph.nodes.recommendation_agent import recommendation_agent_node
 from agents.graph.nodes.sql_agent import sql_agent_node
 from agents.graph.state import AgentPipelineState
 
+# Module-level singleton — persists across requests while the server is running
+_checkpointer = MemorySaver()
+
 
 def _get_llm() -> ChatGroq:
+    print('getting llm')
     return ChatGroq(
         model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
         api_key=os.getenv("GROQ_API_KEY", ""),
         temperature=0,
-        streaming=True,   # enables token-by-token SSE events in stream_mode="messages"
+        streaming=True,
     )
 
 
 def _build_graph() -> StateGraph:
     llm = _get_llm()
-
     graph = StateGraph(AgentPipelineState)
 
-    # Wrap each node to inject the shared LLM instance
     graph.add_node("sql_agent", lambda state: sql_agent_node(state, llm))
     graph.add_node("decision_agent", lambda state: decision_agent_node(state, llm))
     graph.add_node("recommendation_agent", lambda state: recommendation_agent_node(state, llm))
@@ -48,8 +57,21 @@ def _build_graph() -> StateGraph:
 
 
 def get_compiled_pipeline():
-    """Return a compiled, runnable LangGraph pipeline."""
-    return _build_graph().compile()
+    """
+    Returns a compiled pipeline with HITL checkpointing.
+    interrupt_before pauses the graph AFTER the preceding node runs,
+    giving the RM a chance to review and modify that node's output
+    before the next node executes.
+    """
+    return _build_graph().compile(
+        checkpointer=_checkpointer,
+        interrupt_before=["decision_agent", "recommendation_agent", "message_agent"],
+    )
+
+
+def get_thread_config(run_id: str, batch_offset: int) -> dict:
+    """Return the LangGraph config dict for a specific run+batch."""
+    return {"configurable": {"thread_id": f"{run_id}_{batch_offset}"}}
 
 
 def build_initial_state(

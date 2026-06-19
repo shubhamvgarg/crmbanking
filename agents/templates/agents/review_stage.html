@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% load agent_tags %}
+
+{% block title %}Review — {{ stage_label }}{% endblock %}
+
+{% block content %}
+<div class="review-page">
+
+  <!-- Header -->
+  <div class="review-header">
+    <div class="review-title-row">
+      <span class="stage-icon-lg">{{ stage_icon }}</span>
+      <div>
+        <h2>Review: {{ stage_label }}</h2>
+        <p class="review-meta">
+          Run <code>{{ run.run_id|stringformat:"s"|slice:":8" }}</code>
+          &nbsp;·&nbsp; Method: <strong>{{ run.get_decision_method_display }}</strong>
+          &nbsp;·&nbsp; Batch offset: <strong>{{ run.batch_offset }}</strong>
+          &nbsp;·&nbsp; <span class="tag tag-{{ run.status }}">{{ run.get_status_display }}</span>
+        </p>
+      </div>
+    </div>
+    <div class="review-instructions">
+      {% if stage == "sql_agent" %}
+        <p>These customers were fetched from the database. Uncheck any customer the Decision Agent should <strong>not</strong> score.</p>
+      {% elif stage == "decision_agent" %}
+        <p>These customers passed the <strong>{{ run.get_decision_method_display }}</strong> scoring step. Uncheck any candidate you want to exclude before product recommendations are generated.</p>
+      {% elif stage == "recommendation_agent" %}
+        <p>Loan offers have been assigned to each candidate. You may change the recommended product using the dropdown. Uncheck to exclude entirely.</p>
+      {% elif stage == "message_agent" %}
+        <p>Personalised WhatsApp messages are ready. Edit the message text if needed. Approved messages will be queued for delivery in Phase 5.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Bulk controls -->
+  <div class="review-bulk-bar">
+    <button type="button" class="btn btn-sm btn-outline" id="selectAll">Select all</button>
+    <button type="button" class="btn btn-sm btn-outline" id="deselectAll">Deselect all</button>
+    <span class="bulk-count" id="selectedCount"></span>
+  </div>
+
+  {% if not data %}
+    <div class="review-empty">
+      <p>No entries to review at this stage.</p>
+      <a href="{% url 'agents:run_detail' run.run_id %}" class="btn btn-secondary">Back to Run</a>
+    </div>
+  {% else %}
+  <form method="post" action="{% url 'agents:submit_review' run.run_id stage %}" id="reviewForm">
+    {% csrf_token %}
+
+    <!-- ── sql_agent table ─────────────────────────────────────────────── -->
+    {% if stage == "sql_agent" %}
+    <div class="review-table-wrap">
+      <table class="data-table review-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="headerCheck" checked></th>
+            <th>Customer ID</th>
+            <th>Name</th>
+            <th>Account Type</th>
+            <th>Monthly Income</th>
+            <th>Credit Score</th>
+            <th>Tenure (yr)</th>
+            <th>Loan Repayment</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in data %}
+          <tr class="review-row" data-id="{{ u.customer_id }}">
+            <td><input type="checkbox" name="approved_ids" value="{{ u.customer_id }}" checked class="row-check"></td>
+            <td><code>{{ u.customer_id }}</code></td>
+            <td>{{ u.name }}</td>
+            <td><span class="tag tag-info">{{ u.account_type }}</span></td>
+            <td>₹{{ u.salary|floatformat:0 }}</td>
+            <td>{{ u.credit_score|default:"—" }}</td>
+            <td>{{ u.relationship_tenure_months }} mo</td>
+            <td>
+              {% if u.repayment_behavior == "good" %}
+                <span class="tag tag-success">Good</span>
+              {% elif u.repayment_behavior == "no_history" %}
+                <span class="tag tag-info">No history</span>
+              {% else %}
+                <span class="tag tag-danger">{{ u.repayment_behavior }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── decision_agent table ───────────────────────────────────────── -->
+    {% elif stage == "decision_agent" %}
+    <div class="review-table-wrap">
+      <table class="data-table review-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="headerCheck" checked></th>
+            <th>Customer ID</th>
+            <th>Name</th>
+            <th>Score / Confidence</th>
+            <th>Method</th>
+            <th>Scoring Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in data %}
+          <tr class="review-row" data-id="{{ u.customer_id }}">
+            <td><input type="checkbox" name="approved_ids" value="{{ u.customer_id }}" checked class="row-check"></td>
+            <td><code>{{ u.customer_id }}</code></td>
+            <td>{{ u.name }}</td>
+            <td>
+              {% if u.conversion_score %}
+                <div class="score-bar-wrap">
+                  <div class="score-bar {% if u.decision_method == 'ml' %}score-bar-ml{% endif %}"
+                       style="width:{% widthratio u.conversion_score 1 100 %}%"></div>
+                  <span>{{ u.conversion_score|floatformat:2 }}</span>
+                </div>
+              {% else %}—{% endif %}
+            </td>
+            <td><span class="tag tag-method">{{ u.decision_method|default:"—" }}</span></td>
+            <td class="reason-cell">{{ u.scoring_reason|default:"—"|truncatechars:80 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── recommendation_agent table ────────────────────────────────── -->
+    {% elif stage == "recommendation_agent" %}
+    <div class="review-table-wrap">
+      <table class="data-table review-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="headerCheck" checked></th>
+            <th>Customer ID</th>
+            <th>Name</th>
+            <th>Recommended Offer</th>
+            <th>Amount Range</th>
+            <th>Rate</th>
+            <th>Rationale</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in data %}
+          <tr class="review-row" data-id="{{ u.customer_id }}">
+            <td><input type="checkbox" name="approved_ids" value="{{ u.customer_id }}" checked class="row-check"></td>
+            <td><code>{{ u.customer_id }}</code></td>
+            <td>{{ u.name }}</td>
+            <td>
+              <select name="offer_{{ u.customer_id }}" class="offer-select">
+                {% for offer in loan_offers %}
+                  <option value="{{ offer }}" {% if offer == u.recommended_offer %}selected{% endif %}>{{ offer }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>{{ u.offer_details.amount_range|default:"—" }}</td>
+            <td>{{ u.offer_details.interest_rate|default:"—" }}</td>
+            <td class="reason-cell">{{ u.scoring_reason|default:"—"|truncatechars:80 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── message_agent cards ────────────────────────────────────────── -->
+    {% elif stage == "message_agent" %}
+    <div class="message-review-grid">
+      {% for msg in data %}
+      <div class="message-card" data-id="{{ msg.customer_id }}">
+        <div class="message-card-header">
+          <label class="check-label">
+            <input type="checkbox" name="approved_ids" value="{{ msg.customer_id }}" checked class="row-check">
+            <strong>{{ msg.name|default:msg.customer_id }}</strong>
+          </label>
+          <span class="tag tag-info">{{ msg.offer|default:"—" }}</span>
+        </div>
+        <div class="message-card-meta">
+          <span>📞 {{ msg.whatsapp_number|default:"—" }}</span>
+        </div>
+        <textarea name="message_{{ msg.customer_id }}"
+                  class="message-textarea"
+                  rows="5">{{ msg.message|default:"" }}</textarea>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Submit bar -->
+    <div class="review-submit-bar">
+      <div class="review-submit-info">
+        <span id="approvedCountFinal"></span>
+        {% if stage == "message_agent" %}
+          messages will be queued for delivery.
+        {% else %}
+          entries will proceed to the next agent.
+        {% endif %}
+      </div>
+      <div class="review-submit-actions">
+        <a href="{% url 'agents:run_detail' run.run_id %}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary" id="submitBtn">
+          {% if stage == "message_agent" %}
+            ✅ Approve & Continue
+          {% else %}
+            ✅ Approve & Resume Pipeline
+          {% endif %}
+        </button>
+      </div>
+    </div>
+  </form>
+  {% endif %}
+
+</div>
+
+<script>
+(function () {
+  const checks = () => document.querySelectorAll('.row-check');
+  const countEl = document.getElementById('selectedCount');
+  const finalCountEl = document.getElementById('approvedCountFinal');
+  const headerCheck = document.getElementById('headerCheck');
+
+  function updateCount() {
+    const total = checks().length;
+    const selected = [...checks()].filter(c => c.checked).length;
+    if (countEl) countEl.textContent = selected + ' / ' + total + ' selected';
+    if (finalCountEl) finalCountEl.textContent = selected;
+    // dim unchecked rows
+    document.querySelectorAll('.review-row, .message-card').forEach(row => {
+      const id = row.dataset.id;
+      const cb = document.querySelector(`.row-check[value="${id}"]`);
+      row.classList.toggle('row-removed', cb && !cb.checked);
+    });
+  }
+
+  document.getElementById('selectAll')?.addEventListener('click', () => {
+    checks().forEach(c => c.checked = true);
+    if (headerCheck) headerCheck.checked = true;
+    updateCount();
+  });
+  document.getElementById('deselectAll')?.addEventListener('click', () => {
+    checks().forEach(c => c.checked = false);
+    if (headerCheck) headerCheck.checked = false;
+    updateCount();
+  });
+  if (headerCheck) {
+    headerCheck.addEventListener('change', () => {
+      checks().forEach(c => c.checked = headerCheck.checked);
+      updateCount();
+    });
+  }
+  checks().forEach(c => c.addEventListener('change', updateCount));
+
+  document.getElementById('reviewForm')?.addEventListener('submit', function () {
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('submitBtn').textContent = 'Submitting…';
+  });
+
+  updateCount();
+})();
+</script>
+{% endblock %}

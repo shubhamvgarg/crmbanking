@@ -41,7 +41,7 @@
                 <div class="flow-step">
                     <span class="step-icon">🗄</span>
                     <span class="step-label">SQL Agent</span>
-                    <span class="step-sub">Fetch 100 users</span>
+                    <span class="step-sub">Fetch 10 users</span>
                 </div>
                 <span class="flow-arrow">→</span>
                 <div class="flow-step">
@@ -63,7 +63,7 @@
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-run" id="run-btn" onclick="this.textContent='Starting…'; this.disabled=true;">
+            <button type="submit" class="btn btn-primary btn-run" id="run-btn">
                 ▶ Run Agent Pipeline
             </button>
             <p class="run-note">You will be taken to a live progress view where you can watch each agent run in real-time.</p>
@@ -85,7 +85,7 @@
                         <th>Scored</th>
                         <th>Messages</th>
                         <th>Started</th>
-                        <th>Details</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -98,7 +98,15 @@
                         <td>{{ run.scored_users|length }}</td>
                         <td>{{ run.generated_messages|length }}</td>
                         <td>{{ run.started_at|date:"M j, H:i" }}</td>
-                        <td><a href="{% url 'agents:run_detail' run.run_id %}" class="btn btn-sm">View</a></td>
+                        <td>
+                            {% if run.status == 'paused' %}
+                                <a href="{% url 'agents:continue_run' run.run_id %}" class="btn btn-sm btn-primary">Continue</a>
+                            {% elif run.status == 'running' %}
+                                <a href="{% url 'agents:watch_run' run.run_id %}" class="btn btn-sm">Watch</a>
+                            {% else %}
+                                <a href="{% url 'agents:run_detail' run.run_id %}" class="btn btn-sm">View</a>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -114,5 +122,13 @@ function selectMethod(value) {
     document.querySelectorAll('.method-radio').forEach(el => el.classList.remove('selected'));
     document.getElementById('label-' + value).classList.add('selected');
 }
+
+// Disable the button AFTER the browser has queued the form submission,
+// not inside onclick (which cancels submission in many browsers).
+document.getElementById('pipeline-form').addEventListener('submit', function () {
+    const btn = document.getElementById('run-btn');
+    btn.textContent = '⏳ Starting pipeline…';
+    btn.disabled = true;
+});
 </script>
 {% endblock %}

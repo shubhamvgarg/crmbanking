@@ -15,7 +15,7 @@
                 <tr>
                     <th>Run ID</th><th>Method</th><th>Status</th>
                     <th>Fetched</th><th>Scored</th><th>Messages</th>
-                    <th>Started</th><th>Details</th>
+                    <th>Started</th><th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -28,7 +28,15 @@
                     <td>{{ run.scored_users|length }}</td>
                     <td>{{ run.generated_messages|length }}</td>
                     <td>{{ run.started_at|date:"M j, Y H:i" }}</td>
-                    <td><a href="{% url 'agents:run_detail' run.run_id %}" class="btn btn-sm">View</a></td>
+                    <td>
+                        {% if run.status == 'paused' %}
+                            <a href="{% url 'agents:continue_run' run.run_id %}" class="btn btn-sm btn-primary">Continue</a>
+                        {% elif run.status == 'running' %}
+                            <a href="{% url 'agents:watch_run' run.run_id %}" class="btn btn-sm">Watch</a>
+                        {% else %}
+                            <a href="{% url 'agents:run_detail' run.run_id %}" class="btn btn-sm">View</a>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

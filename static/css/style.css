@@ -752,3 +752,175 @@ h1 {
 }
 .error-box h2 { color: #991b1b; margin: 0 0 0.75rem; }
 .error-box pre { font-size: 0.8rem; overflow-x: auto; white-space: pre-wrap; }
+
+/* ── Phase 4: Review banner (watch page) ────────────────────────────────── */
+
+.review-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border-radius: 12px;
+    margin-top: 1.5rem;
+    background: #fffbeb;
+    border: 1px solid #fbbf24;
+    animation: fadeIn 0.4s ease;
+}
+.review-banner-icon { font-size: 2rem; }
+.review-banner-text { flex: 1; }
+.review-banner-text strong { display: block; font-size: 1rem; margin-bottom: 0.2rem; color: #92400e; }
+.review-banner-text span { font-size: 0.88rem; color: #78350f; }
+
+.swc-status.review {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fbbf24;
+}
+
+/* ── Phase 4: Review page ─────────────────────────────────────────────────── */
+
+.review-page { padding: 1.5rem 0; }
+
+.review-header {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+}
+.review-title-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.stage-icon-lg { font-size: 2.5rem; line-height: 1; }
+.review-title-row h2 { margin: 0 0 0.25rem; font-size: 1.4rem; }
+.review-meta { font-size: 0.83rem; color: #64748b; margin: 0; }
+.review-instructions p { margin: 0; color: #475569; font-size: 0.9rem; }
+
+.review-bulk-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.bulk-count { font-size: 0.85rem; color: #64748b; }
+
+.review-table-wrap { overflow-x: auto; margin-bottom: 1.5rem; }
+
+.review-table .row-check { width: 16px; height: 16px; cursor: pointer; }
+
+.review-row.row-removed td { opacity: 0.4; }
+.review-row.row-removed { background: #fff5f5; }
+
+.score-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 110px;
+}
+.score-bar {
+    height: 8px;
+    background: #2563eb;
+    border-radius: 4px;
+    min-width: 4px;
+}
+.score-bar-ml { background: #7c3aed; }
+.score-bar-wrap span { font-size: 0.8rem; color: #475569; white-space: nowrap; }
+
+.reason-cell { font-size: 0.8rem; color: #64748b; max-width: 280px; }
+
+.offer-select {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.82rem;
+    background: #fff;
+    cursor: pointer;
+}
+
+/* ── Message review cards ─────────────────────────────────────────────────── */
+
+.message-review-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+.message-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem;
+    transition: border-color 0.2s, opacity 0.2s;
+}
+.message-card.row-removed {
+    opacity: 0.4;
+    border-color: #fca5a5;
+    background: #fff5f5;
+}
+.message-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.message-card-header .check-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-weight: 600;
+}
+.message-card-meta { font-size: 0.82rem; color: #64748b; margin-bottom: 0.6rem; }
+.message-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.6rem;
+    font-size: 0.82rem;
+    font-family: inherit;
+    resize: vertical;
+    color: #1e293b;
+    line-height: 1.5;
+}
+.message-textarea:focus { border-color: #2563eb; outline: none; }
+
+/* ── Review submit bar ────────────────────────────────────────────────────── */
+
+.review-submit-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin-top: 1rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.review-submit-info { font-size: 0.88rem; color: #475569; }
+.review-submit-info #approvedCountFinal { font-weight: 700; color: #1e293b; }
+.review-submit-actions { display: flex; gap: 0.75rem; }
+
+.review-empty {
+    text-align: center;
+    padding: 3rem;
+    color: #64748b;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+
+.tag-method {
+    background: #ede9fe;
+    color: #5b21b6;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
