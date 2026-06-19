@@ -6,3 +6,5 @@ langchain-groq>=0.2
 langchain-core>=0.3
 scikit-learn>=1.5
 numpy>=1.26
+pika>=1.4
+twilio>=9.10
