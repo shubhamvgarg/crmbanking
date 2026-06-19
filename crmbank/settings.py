@@ -30,7 +30,13 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rm_auth",
+    "customers",
+    "agents",
 ]
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+AGENT_BATCH_SIZE = int(os.getenv("AGENT_BATCH_SIZE", "100"))
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
