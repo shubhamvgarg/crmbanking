@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Customers — CRM Bank{% endblock %}
+
+{% block content %}
+<section class="customers-section">
+    <div class="section-header">
+        <h1>Customer Data <span class="badge">{{ total }}</span></h1>
+    </div>
+
+    <form method="get" class="filter-bar">
+        <input
+            type="search"
+            name="q"
+            value="{{ search }}"
+            placeholder="Search by name or ID…"
+            class="filter-input"
+        >
+        <select name="account_type" class="filter-select">
+            <option value="">All account types</option>
+            {% for value, label in account_types %}
+            <option value="{{ value }}" {% if value == selected_account_type %}selected{% endif %}>
+                {{ label }}
+            </option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Filter</button>
+        {% if search or selected_account_type %}
+        <a href="{% url 'customers:list' %}" class="btn btn-secondary">Clear</a>
+        {% endif %}
+    </form>
+
+    {% if page_obj.object_list %}
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Age</th>
+                    <th>Occupation</th>
+                    <th>Salary (₹)</th>
+                    <th>Account</th>
+                    <th>Tenure (mo)</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in page_obj %}
+                <tr>
+                    <td><code>{{ c.customer_id }}</code></td>
+                    <td>{{ c.name }}</td>
+                    <td>{{ c.age }}</td>
+                    <td>{{ c.occupation }}</td>
+                    <td>{{ c.salary|floatformat:0 }}</td>
+                    <td><span class="tag tag-{{ c.account_type }}">{{ c.get_account_type_display }}</span></td>
+                    <td>{{ c.relationship_tenure_months }}</td>
+                    <td>
+                        <a href="{% url 'customers:detail' c.customer_id %}" class="btn btn-sm">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&q={{ search }}&account_type={{ selected_account_type }}" class="btn btn-secondary">« Prev</a>
+        {% endif %}
+        <span class="page-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}&q={{ search }}&account_type={{ selected_account_type }}" class="btn btn-secondary">Next »</a>
+        {% endif %}
+    </div>
+
+    {% else %}
+    <p class="empty-state">No customers found. Run <code>python manage.py seed_demo_data</code> to populate data.</p>
+    {% endif %}
+</section>
+{% endblock %}

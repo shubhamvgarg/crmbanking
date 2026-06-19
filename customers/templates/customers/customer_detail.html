@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}{{ customer.name }} — CRM Bank{% endblock %}
+
+{% block content %}
+<section class="customer-detail">
+    <div class="back-link">
+        <a href="{% url 'customers:list' %}">← Back to customers</a>
+    </div>
+
+    <h1>{{ customer.name }} <code class="cust-id">{{ customer.customer_id }}</code></h1>
+
+    <!-- Profile -->
+    <div class="detail-card">
+        <h2>Profile</h2>
+        <dl class="meta-grid">
+            <dt>Age</dt>           <dd>{{ customer.age }}</dd>
+            <dt>Occupation</dt>    <dd>{{ customer.occupation }}</dd>
+            <dt>Salary</dt>        <dd>₹{{ customer.salary|floatformat:0 }}</dd>
+            <dt>Account type</dt>  <dd>{{ customer.get_account_type_display }}</dd>
+            <dt>Tenure</dt>        <dd>{{ customer.relationship_tenure_months }} months</dd>
+            <dt>WhatsApp</dt>      <dd>{{ customer.whatsapp_number }}</dd>
+            <dt>Email</dt>         <dd>{{ customer.email }}</dd>
+            <dt>Products</dt>      <dd>{{ customer.existing_products|join:", " }}</dd>
+        </dl>
+    </div>
+
+    <!-- Transactions -->
+    <div class="detail-card">
+        <h2>Transactions (latest 2 months)</h2>
+        {% if customer.transactions.all %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th>Credits (₹)</th>
+                    <th>Debits (₹)</th>
+                    <th>Salary Credit (₹)</th>
+                    <th>Avg Balance (₹)</th>
+                    <th>Large Txns</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in customer.transactions.all %}
+                <tr>
+                    <td>{{ t.month|date:"M Y" }}</td>
+                    <td>{{ t.total_monthly_credits|floatformat:0 }}</td>
+                    <td>{{ t.total_monthly_debits|floatformat:0 }}</td>
+                    <td>{{ t.salary_credits|floatformat:0 }}</td>
+                    <td>{{ t.average_balance|floatformat:0 }}</td>
+                    <td>{{ t.recent_large_transactions|length }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="empty-state">No transaction data.</p>{% endif %}
+    </div>
+
+    <!-- CC Transactions -->
+    <div class="detail-card">
+        <h2>Credit Card Transactions</h2>
+        {% if customer.cc_transactions.all %}
+        <table class="data-table">
+            <thead>
+                <tr><th>Month</th><th>Total CC Spend (₹)</th><th>Large Txns</th></tr>
+            </thead>
+            <tbody>
+                {% for cc in customer.cc_transactions.all %}
+                <tr>
+                    <td>{{ cc.month|date:"M Y" }}</td>
+                    <td>{{ cc.total_monthly_credit|floatformat:0 }}</td>
+                    <td>{{ cc.recent_large_transactions|length }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="empty-state">No credit card transactions.</p>{% endif %}
+    </div>
+
+    <!-- Loan History -->
+    <div class="detail-card">
+        <h2>Loan History</h2>
+        {% if customer.loan_history %}
+        {% with lh=customer.loan_history %}
+        <dl class="meta-grid">
+            <dt>Repayment</dt>   <dd><span class="tag tag-{{ lh.repayment_behavior }}">{{ lh.get_repayment_behavior_display }}</span></dd>
+            <dt>Credit score</dt><dd>{% if lh.credit_score %}{{ lh.credit_score }}{% else %}N/A{% endif %}</dd>
+            <dt>Active loans</dt><dd>{{ lh.existing_loans|length }}</dd>
+            <dt>Past applications</dt><dd>{{ lh.previous_applications|length }}</dd>
+        </dl>
+        {% endwith %}
+        {% else %}<p class="empty-state">No loan history.</p>{% endif %}
+    </div>
+
+    <!-- Credit Cards -->
+    <div class="detail-card">
+        <h2>Credit Cards</h2>
+        {% if customer.credit_cards.all %}
+        <table class="data-table">
+            <thead>
+                <tr><th>Card ID</th><th>Limit (₹)</th><th>Usage &gt; 80%?</th><th>Card Score</th></tr>
+            </thead>
+            <tbody>
+                {% for card in customer.credit_cards.all %}
+                <tr>
+                    <td><code>{{ card.cd_id }}</code></td>
+                    <td>{{ card.cd_limit|floatformat:0 }}</td>
+                    <td>{% if card.cd_usage_above_80pct %}<span class="tag tag-bad">Yes</span>{% else %}<span class="tag tag-good">No</span>{% endif %}</td>
+                    <td>{{ card.cd_score }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="empty-state">No credit cards on record.</p>{% endif %}
+    </div>
+</section>
+{% endblock %}
