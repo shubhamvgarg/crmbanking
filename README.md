@@ -106,7 +106,7 @@ RM selects decision method + Trigger (One Click)
         │
         ▼
 ┌───────────────────┐
-│   1. SQL Agent    │  ← Fetch 100 users → JSON
+│   1. SQL Agent    │  ← Fetch 2 users → JSON
 └─────────┬─────────┘
           │  [Human Review: approve / remove users]
           ▼
@@ -739,7 +739,7 @@ TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 TWILIO_STATUS_CALLBACK_URL=https://your-domain.com/whatsapp/webhook/
 
 # Agent Pipeline
-AGENT_BATCH_SIZE=100
+AGENT_BATCH_SIZE=2
 ML_MODEL_PATH=models/loan_conversion_model.pkl
 DEFAULT_DECISION_METHOD=rule_based
 ```
@@ -971,14 +971,22 @@ HITL Dashboard ──► Message Queue ──► Twilio WhatsApp ──► E2E &
 
 **Deliverables:**
 
-- [ ] Create `message_queue` Django app
-- [ ] Connect to **online RabbitMQ service** via `RABBITMQ_URL` (no Docker)
-- [ ] `QueuedMessage` and `DeliveryLog` models
-- [ ] `notification_tool` — producer publishes JSON payload to `whatsapp.messages` queue
-- [ ] Wire Message Generator Agent to call `notification_tool` after RM approval
-- [ ] `run_consumer` management command — listens on queue, deserializes payload
-- [ ] `check_rabbitmq` management command — verify cloud broker connection
-- [ ] Retry logic and error logging for failed publishes/consumes
+- [x] Create `message_queue` Django app
+- [x] Connect to **online RabbitMQ service** via `RABBITMQ_URL` (no Docker)
+- [x] `QueuedMessage` and `DeliveryLog` models
+- [x] `notification_tool` — producer publishes JSON payload to `whatsapp.messages` queue
+- [x] Wire Message Generator Agent to call `notification_tool` after RM approval
+- [x] `run_consumer` management command — listens on queue, deserializes payload
+- [x] `check_rabbitmq` management command — verify cloud broker connection
+- [x] Retry logic and error logging for failed publishes/consumes
+
+**Phase 5 commands:**
+
+```bash
+python manage.py check_rabbitmq
+python manage.py run_consumer
+python manage.py run_consumer --once
+```
 
 **Exit criteria:** Approved messages appear in RabbitMQ queue; consumer picks them up and logs processing (WhatsApp send stubbed until Phase 6).
 
@@ -990,13 +998,23 @@ HITL Dashboard ──► Message Queue ──► Twilio WhatsApp ──► E2E &
 
 **Deliverables:**
 
-- [ ] Create `whatsapp` Django app
-- [ ] `send_whatsapp_message()` service using Twilio Python SDK
-- [ ] `WhatsAppDelivery` model — message SID, status, timestamps
-- [ ] Wire queue consumer to call Twilio send function
-- [ ] `POST /whatsapp/webhook/` — Twilio status callback (sent / delivered / failed)
-- [ ] `GET /whatsapp/delivery-log/` — RM view of sent messages and statuses
-- [ ] Twilio Sandbox setup documented and tested
+- [x] Create `whatsapp` Django app
+- [x] `send_whatsapp_message()` service using Twilio Python SDK
+- [x] `WhatsAppDelivery` model — message SID, status, timestamps
+- [x] Wire queue consumer to call Twilio send function
+- [x] `POST /whatsapp/webhook/` — Twilio status callback (sent / delivered / failed)
+- [x] `GET /whatsapp/delivery-log/` — RM view of sent messages and statuses
+- [x] Twilio Sandbox setup documented and tested
+
+**Phase 6 endpoints and commands:**
+
+```bash
+python manage.py run_consumer
+python manage.py run_consumer --once
+```
+
+- Twilio webhook: `/whatsapp/webhook/`
+- RM delivery log: `/whatsapp/delivery-log/`
 
 **Exit criteria:** End-to-end: RM approves a message → queue → consumer → Twilio sends WhatsApp → delivery status recorded via webhook.
 
@@ -1008,12 +1026,19 @@ HITL Dashboard ──► Message Queue ──► Twilio WhatsApp ──► E2E &
 
 **Deliverables:**
 
-- [ ] Unified RM dashboard — login, method selection, pipeline trigger, stage reviews, delivery log
-- [ ] Frontend polish — HTMX/Alpine.js for interactive review tables without full page reloads
-- [ ] Global error handling — agent failures, RabbitMQ downtime, Twilio API errors surfaced to RM
-- [ ] Logging and audit trail — AgentRun history, HumanReview records, delivery logs
-- [ ] Full E2E test run: all customers, all four agents, HITL at each stage, messages delivered via Twilio
-- [ ] Final README / `.env.example` review against implemented code
+- [x] Unified RM dashboard — login, method selection, pipeline trigger, stage reviews, delivery log
+- [x] Frontend polish — interactive review tables, live watch page, clear continue/review actions
+- [x] Global error handling — agent failures, RabbitMQ downtime, Twilio API errors surfaced to RM
+- [x] Logging and audit trail — AgentRun history, HumanReview records, delivery logs
+- [x] Full E2E validation command: customers, agents, HITL, queue, Twilio readiness
+- [x] Final README / `.env.example` review against implemented code
+
+**Phase 7 validation command:**
+
+```bash
+python manage.py validate_e2e
+python manage.py validate_e2e --strict
+```
 
 **Exit criteria:** A new RM can log in, run the full pipeline with their chosen decision method, review every batch, and confirm WhatsApp messages were sent — without developer intervention.
 
