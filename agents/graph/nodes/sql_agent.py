@@ -18,8 +18,6 @@ def sql_agent_node(state: AgentPipelineState, llm) -> dict:
     LangGraph node: fetches a customer batch via sql_query_tool.
     Returns updated state keys: raw_users, current_stage, sql_agent_log.
     """
-    print("Creating react agent")
-    print(llm)
     agent = create_react_agent(llm, tools=[sql_query_tool])
 
     prompt = (

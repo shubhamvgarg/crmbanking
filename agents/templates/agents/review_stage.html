@@ -114,7 +114,7 @@
               {% if u.conversion_score %}
                 <div class="score-bar-wrap">
                   <div class="score-bar {% if u.decision_method == 'ml' %}score-bar-ml{% endif %}"
-                       style="width:{% widthratio u.conversion_score 1 100 %}%"></div>
+                       data-score="{{ u.conversion_score }}"></div>
                   <span>{{ u.conversion_score|floatformat:2 }}</span>
                 </div>
               {% else %}—{% endif %}
@@ -250,6 +250,14 @@
     });
   }
   checks().forEach(c => c.addEventListener('change', updateCount));
+
+  // Render score-bar widths in JS to avoid template tags inside inline CSS.
+  document.querySelectorAll('.score-bar[data-score]').forEach((bar) => {
+    const raw = parseFloat(bar.dataset.score || '0');
+    const percentage = raw <= 1 ? raw * 100 : raw;
+    const bounded = Math.max(0, Math.min(100, percentage));
+    bar.style.width = bounded + '%';
+  });
 
   document.getElementById('reviewForm')?.addEventListener('submit', function () {
     document.getElementById('submitBtn').disabled = true;

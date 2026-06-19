@@ -1,12 +1,13 @@
 """
-Notification Tool (Phase 3 stub)
-In Phase 5 this will publish payloads to RabbitMQ.
-For now it returns the payload as a confirmation dict.
+Notification Tool (Phase 5)
+Publishes approved WhatsApp outreach payloads to RabbitMQ.
 """
 
 import json
 
 from langchain_core.tools import tool
+
+from message_queue.rabbitmq import enqueue_message
 
 
 @tool
@@ -18,15 +19,18 @@ def notification_tool(
 ) -> str:
     """
     Queue a personalized WhatsApp message for delivery.
-    Publishes the message payload to the message queue.
-    In Phase 3 this is a stub — it logs and returns the payload.
-    In Phase 5 it will publish to RabbitMQ.
+    Publishes the message payload to RabbitMQ through the message_queue app.
     """
     payload = {
-        "user": user,
+        "customer_name": user,
+        "name": user,
         "whatsapp_number": whatsapp_number,
         "offer": offer,
-        "personalize_message": personalize_message,
-        "status": "queued_stub",
+        "message": personalize_message,
     }
+    queued = enqueue_message(payload)
+    payload["status"] = queued.status
+    payload["message_id"] = str(queued.message_id)
+    payload["queued"] = queued.status == "published"
+    payload["error"] = queued.last_error
     return json.dumps(payload)

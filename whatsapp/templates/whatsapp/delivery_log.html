@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}WhatsApp Delivery Log — CRM Bank{% endblock %}
+
+{% block content %}
+<section class="customers-section">
+    <div class="section-header">
+        <h1>WhatsApp Delivery Log <span class="badge">{{ deliveries|length }}</span></h1>
+        <p class="subtitle">Recent Twilio WhatsApp sends and status callbacks.</p>
+    </div>
+
+    {% if deliveries %}
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>SID</th>
+                    <th>Run</th>
+                    <th>Customer</th>
+                    <th>To</th>
+                    <th>Status</th>
+                    <th>Sent</th>
+                    <th>Delivered</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in deliveries %}
+                <tr>
+                    <td><code>{{ d.message_sid|slice:":12" }}…</code></td>
+                    <td>
+                        {% if d.queued_message and d.queued_message.run %}
+                            <code>{{ d.queued_message.run.run_id|stringformat:"s"|slice:":8" }}…</code>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if d.queued_message %}
+                            {{ d.queued_message.customer_name }}<br>
+                            <small>{{ d.queued_message.customer_id }}</small>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>{{ d.to_number }}</td>
+                    <td><span class="tag tag-status-{{ d.status }}">{{ d.status }}</span></td>
+                    <td>{{ d.sent_at|date:"M j, H:i"|default:"—" }}</td>
+                    <td>{{ d.delivered_at|date:"M j, H:i"|default:"—" }}</td>
+                    <td>{{ d.error_message|default:d.error_code|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty-state">No WhatsApp deliveries yet. Approve messages and run the queue consumer to send via Twilio.</p>
+    {% endif %}
+</section>
+{% endblock %}

@@ -89,4 +89,27 @@ def change_password_view(request):
 @rm_login_required
 def dashboard_view(request):
     rm_user = get_authenticated_rm(request)
-    return render(request, "rm_auth/dashboard.html", {"rm_user": rm_user})
+    from agents.models import AgentRun, HumanReview
+    from customers.models import CustomerProfile
+    from message_queue.models import QueuedMessage
+    from whatsapp.models import WhatsAppDelivery
+
+    latest_run = AgentRun.objects.filter(triggered_by=rm_user).order_by("-started_at").first()
+    dashboard_stats = {
+        "customers": CustomerProfile.objects.count(),
+        "runs": AgentRun.objects.filter(triggered_by=rm_user).count(),
+        "paused_runs": AgentRun.objects.filter(triggered_by=rm_user, status="paused").count(),
+        "reviews": HumanReview.objects.filter(reviewed_by=rm_user).count(),
+        "queued_messages": QueuedMessage.objects.count(),
+        "published_messages": QueuedMessage.objects.filter(status="published").count(),
+        "consumed_messages": QueuedMessage.objects.filter(status="consumed").count(),
+        "failed_queue_messages": QueuedMessage.objects.filter(status__in=["publish_failed", "failed"]).count(),
+        "whatsapp_deliveries": WhatsAppDelivery.objects.count(),
+        "delivered_messages": WhatsAppDelivery.objects.filter(status="delivered").count(),
+        "failed_deliveries": WhatsAppDelivery.objects.filter(status__in=["failed", "undelivered"]).count(),
+    }
+    return render(request, "rm_auth/dashboard.html", {
+        "rm_user": rm_user,
+        "dashboard_stats": dashboard_stats,
+        "latest_run": latest_run,
+    })

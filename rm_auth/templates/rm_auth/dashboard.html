@@ -22,7 +22,68 @@
             <a href="{% url 'agents:dashboard' %}" class="btn btn-primary">▶ Run Agent Pipeline</a>
             <a href="{% url 'customers:list' %}" class="btn btn-secondary">Browse Customers</a>
             <a href="{% url 'agents:run_list' %}" class="btn btn-secondary">View Run History</a>
+            <a href="{% url 'whatsapp:delivery_log' %}" class="btn btn-secondary">WhatsApp Delivery Log</a>
         </div>
     </div>
+
+    <div class="stats-row dashboard-stats">
+        <div class="stat-card">
+            <div class="stat-number">{{ dashboard_stats.customers }}</div>
+            <div class="stat-label">Customers</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ dashboard_stats.runs }}</div>
+            <div class="stat-label">Pipeline Runs</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ dashboard_stats.paused_runs }}</div>
+            <div class="stat-label">Paused Reviews</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ dashboard_stats.reviews }}</div>
+            <div class="stat-label">RM Reviews</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ dashboard_stats.queued_messages }}</div>
+            <div class="stat-label">Queue Records</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ dashboard_stats.consumed_messages }}</div>
+            <div class="stat-label">Consumed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ dashboard_stats.whatsapp_deliveries }}</div>
+            <div class="stat-label">WhatsApp Sends</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ dashboard_stats.failed_deliveries }}</div>
+            <div class="stat-label">Failed Sends</div>
+        </div>
+    </div>
+
+    {% if latest_run %}
+    <div class="placeholder-card latest-run-card">
+        <h2>Latest Pipeline Run</h2>
+        <dl class="meta-list">
+            <dt>Run ID</dt>
+            <dd><code>{{ latest_run.run_id|stringformat:"s"|slice:":8" }}…</code></dd>
+            <dt>Status</dt>
+            <dd><span class="tag tag-status-{{ latest_run.status }}">{{ latest_run.get_status_display }}</span></dd>
+            <dt>Stage</dt>
+            <dd>{{ latest_run.get_current_stage_display }}</dd>
+            <dt>Decision method</dt>
+            <dd>{{ latest_run.get_decision_method_display }}</dd>
+        </dl>
+        <div class="dashboard-actions">
+            {% if latest_run.status == "paused" %}
+                <a href="{% url 'agents:continue_run' latest_run.run_id %}" class="btn btn-primary">Continue Review</a>
+            {% elif latest_run.status == "running" %}
+                <a href="{% url 'agents:watch_run' latest_run.run_id %}" class="btn btn-primary">Watch Run</a>
+            {% else %}
+                <a href="{% url 'agents:run_detail' latest_run.run_id %}" class="btn btn-secondary">View Results</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </section>
 {% endblock %}

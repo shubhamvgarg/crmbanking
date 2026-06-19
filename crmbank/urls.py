@@ -7,5 +7,6 @@ urlpatterns = [
     path("auth/", include("rm_auth.urls")),
     path("customers/", include("customers.urls")),
     path("agents/", include("agents.urls")),
+    path("whatsapp/", include("whatsapp.urls")),
     path("", lambda request: redirect("rm_auth:dashboard")),
 ]

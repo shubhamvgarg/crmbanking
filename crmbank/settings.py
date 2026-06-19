@@ -32,11 +32,30 @@ INSTALLED_APPS = [
     "rm_auth",
     "customers",
     "agents",
+    "message_queue",
+    "whatsapp",
 ]
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-AGENT_BATCH_SIZE = int(os.getenv("AGENT_BATCH_SIZE", "10"))
+AGENT_BATCH_SIZE = int(os.getenv("AGENT_BATCH_SIZE", "2"))
+
+RABBITMQ_URL = os.getenv("RABBITMQ_URL", "")
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "")
+RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", "5671"))
+RABBITMQ_USER = os.getenv("RABBITMQ_USER", "")
+RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD", "")
+RABBITMQ_VHOST = os.getenv("RABBITMQ_VHOST", "")
+RABBITMQ_USE_SSL = os.getenv("RABBITMQ_USE_SSL", "True").lower() in ("true", "1", "yes")
+RABBITMQ_QUEUE = os.getenv("RABBITMQ_QUEUE", "whatsapp.messages")
+RABBITMQ_EXCHANGE = os.getenv("RABBITMQ_EXCHANGE", "crm.outreach")
+RABBITMQ_ROUTING_KEY = os.getenv("RABBITMQ_ROUTING_KEY", RABBITMQ_QUEUE)
+
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
+TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "")
+TWILIO_STATUS_CALLBACK_URL = os.getenv("TWILIO_STATUS_CALLBACK_URL", "")
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

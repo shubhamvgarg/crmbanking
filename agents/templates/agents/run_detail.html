@@ -185,13 +185,103 @@
                 <div class="msg-number">{{ msg.whatsapp_number }}</div>
                 <div class="msg-body">{{ msg.message }}</div>
                 <div class="msg-status {% if msg.queued %}queued{% endif %}">
-                    {% if msg.queued %}✓ Queued{% else %}○ Stub (Phase 5 will queue via RabbitMQ){% endif %}
+                    {% if msg.queued %}
+                        ✓ Published to RabbitMQ
+                    {% elif msg.queue_status %}
+                        ○ Queue status: {{ msg.queue_status }}
+                    {% else %}
+                        ○ Awaiting RM approval
+                    {% endif %}
+                    {% if msg.queue_error %}
+                        <small>{{ msg.queue_error|truncatechars:120 }}</small>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
         </div>
         {% endif %}
     </details>
+
+    <details class="stage-card" open>
+        <summary class="stage-header">
+            <span class="stage-badge">5</span>
+            Queue & WhatsApp Audit — {{ queued_messages|length }} queue records
+        </summary>
+        {% if queued_messages %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Customer</th>
+                        <th>Queue Status</th>
+                        <th>Published</th>
+                        <th>Consumed</th>
+                        <th>Twilio Status</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for qm in queued_messages %}
+                    <tr>
+                        <td>
+                            {{ qm.customer_name }}<br>
+                            <small>{{ qm.customer_id }}</small>
+                        </td>
+                        <td><span class="tag tag-status-{{ qm.status }}">{{ qm.status }}</span></td>
+                        <td>{{ qm.published_at|date:"M j, H:i"|default:"—" }}</td>
+                        <td>{{ qm.consumed_at|date:"M j, H:i"|default:"—" }}</td>
+                        <td>
+                            {% if qm.whatsapp_delivery %}
+                                <span class="tag tag-status-{{ qm.whatsapp_delivery.status }}">{{ qm.whatsapp_delivery.status }}</span>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>{{ qm.last_error|truncatechars:120|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="empty-state">No queue records for this run yet. They are created after final RM message approval.</p>
+        {% endif %}
+    </details>
+
+    {% if reviews %}
+    <details class="stage-card">
+        <summary class="stage-header">
+            <span class="stage-badge">✓</span>
+            Human Review Audit — {{ reviews|length }} review records
+        </summary>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Stage</th>
+                        <th>Batch Offset</th>
+                        <th>Original</th>
+                        <th>Approved</th>
+                        <th>Removed</th>
+                        <th>Reviewed At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for review in reviews %}
+                    <tr>
+                        <td>{{ review.get_stage_display }}</td>
+                        <td>{{ review.batch_offset }}</td>
+                        <td>{{ review.original_data|length }}</td>
+                        <td>{{ review.approved_data|length }}</td>
+                        <td>{{ review.removed_ids|length }}</td>
+                        <td>{{ review.reviewed_at|date:"M j, H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+    {% endif %}
 
 </section>
 {% endblock %}

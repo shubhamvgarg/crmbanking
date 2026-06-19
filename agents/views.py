@@ -1,7 +1,9 @@
 import json
+import time
 import traceback
 
 from django.contrib import messages
+from django.conf import settings
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -17,6 +19,22 @@ from .graph.pipeline import (
     get_thread_config,
 )
 from .models import DECISION_METHODS, AgentRun, HumanReview
+
+
+def _debug_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    try:
+        with open("debug-651e1e.log", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "sessionId": "651e1e",
+                "runId": str(run_id or "")[:8],
+                "hypothesisId": hypothesis_id,
+                "location": location,
+                "message": message,
+                "data": data,
+                "timestamp": int(time.time() * 1000),
+            }) + "\n")
+    except Exception:
+        pass
 
 # ── Stage metadata ────────────────────────────────────────────────────────────
 
@@ -126,6 +144,23 @@ def _get_pending_review_stage(run: AgentRun) -> str:
     return _CURRENT_STAGE_TO_REVIEW_STAGE.get(run.current_stage, "sql_agent")
 
 
+def _publish_approved_messages(run: AgentRun, approved_data: list[dict]) -> list[dict]:
+    """Publish RM-approved final messages to RabbitMQ and annotate queue status."""
+    from message_queue.rabbitmq import enqueue_message
+
+    published = []
+    for item in approved_data:
+        queued = enqueue_message(item, run=run, batch_offset=run.batch_offset)
+        published.append({
+            **item,
+            "queued": queued.status == "published",
+            "queue_status": queued.status,
+            "queued_message_id": str(queued.message_id),
+            "queue_error": queued.last_error,
+        })
+    return published
+
+
 # ── Views ─────────────────────────────────────────────────────────────────────
 
 @rm_login_required
@@ -149,14 +184,12 @@ def trigger_run(request):
     if decision_method not in valid_methods:
         messages.error(request, "Please select a valid decision method.")
         return redirect("agents:dashboard")
-    print("Creating run")
     run = AgentRun.objects.create(
         triggered_by=rm_user,
         decision_method=decision_method,
         status="running",
         current_stage="sql",
     )
-    # print("Run created: ", run.run_id)
     return redirect("agents:watch_run", run_id=run.run_id)
 
 
@@ -200,8 +233,6 @@ def continue_run(request, run_id):
 @rm_login_required
 @require_http_methods(["GET"])
 def stream_run(request, run_id):
-    print("Streaming run")
-    print("Run ID: ", run_id)
     """
     SSE endpoint — runs (or resumes) the LangGraph pipeline for a given run.
 
@@ -247,7 +278,7 @@ def stream_run(request, run_id):
                 input_state = build_initial_state(
                     run_id=str(run.run_id),
                     batch_offset=run.batch_offset,
-                    batch_size=10,
+                    batch_size=settings.AGENT_BATCH_SIZE,
                     decision_method=run.decision_method,
                 )
                 yield _sse({
@@ -312,7 +343,7 @@ def stream_run(request, run_id):
                 _save_final_state(run, state_vals)
                 from customers.models import CustomerProfile
                 total = CustomerProfile.objects.count()
-                next_offset = run.batch_offset + 10
+                next_offset = run.batch_offset + settings.AGENT_BATCH_SIZE
                 yield _sse({
                     "type": "review_needed",
                     "stage": "message_agent",
@@ -363,6 +394,15 @@ def review_stage(request, run_id, stage):
         return redirect("agents:run_detail", run_id=run_id)
 
     data = getattr(run, _RUN_FIELD[stage], [])
+    # region agent log
+    _debug_log(str(run_id), "H1,H2,H3,H4", "agents/views.py:review_stage.entry", "Rendering review_stage", {
+        "stage": stage,
+        "data_count": len(data),
+        "conversion_score_sample": [type(item.get("conversion_score")).__name__ for item in data[:5]],
+        "conversion_score_values_sample": [item.get("conversion_score") for item in data[:5]],
+        "decision_method_sample": [item.get("decision_method") for item in data[:5]],
+    })
+    # endregion
     return render(request, "agents/review_stage.html", {
         "run": run,
         "stage": stage,
@@ -431,6 +471,7 @@ def submit_review(request, run_id, stage):
             new_msg = request.POST.get(f"message_{cid}", "").strip()
             if new_msg:
                 entry["message"] = new_msg
+        approved_data = _publish_approved_messages(run, approved_data)
         run.generated_messages = approved_data
 
     # ── Save HumanReview record ───────────────────────────────────────────────
@@ -468,7 +509,7 @@ def submit_review(request, run_id, stage):
         # Final stage: decide whether to start next batch or complete the run
         from customers.models import CustomerProfile
         total = CustomerProfile.objects.count()
-        next_offset = run.batch_offset + 10
+        next_offset = run.batch_offset + settings.AGENT_BATCH_SIZE
 
         if next_offset < total:
             run.batch_offset = next_offset
@@ -498,7 +539,12 @@ def submit_review(request, run_id, stage):
 def run_detail(request, run_id):
     run = get_object_or_404(AgentRun, run_id=run_id)
     reviews = run.reviews.order_by("batch_offset", "stage")
-    return render(request, "agents/run_detail.html", {"run": run, "reviews": reviews})
+    queued_messages = run.queued_messages.select_related("whatsapp_delivery").order_by("-created_at")
+    return render(request, "agents/run_detail.html", {
+        "run": run,
+        "reviews": reviews,
+        "queued_messages": queued_messages,
+    })
 
 
 @rm_login_required

@@ -1,16 +1,14 @@
 """
 Message Generator Agent Node
-Uses the LLM to generate personalized WhatsApp messages for each recommended
-customer, then calls notification_tool to queue each message.
+Uses the LLM to generate personalized WhatsApp message drafts for each
+recommended customer. Phase 5 publishes only RM-approved messages later.
 """
 
 import json
 
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
-from langgraph.prebuilt import create_react_agent
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from agents.graph.state import AgentPipelineState
-from agents.tools.notification_tool import notification_tool
 
 _SYSTEM_PROMPT = """You are a WhatsApp message generation agent for a bank CRM.
 Your job is to generate personalized, friendly, and professional loan outreach messages.
@@ -86,7 +84,7 @@ def _generate_messages_batch(llm, recommended_users: list[dict]) -> list[dict]:
 def message_agent_node(state: AgentPipelineState, llm) -> dict:
     """
     LangGraph node: generates personalized WhatsApp messages for each recommended
-    customer and queues them via notification_tool.
+    customer.
     Returns updated state keys: messages, current_stage, message_agent_log.
     """
     if not state["recommended_users"]:
@@ -102,35 +100,11 @@ def message_agent_node(state: AgentPipelineState, llm) -> dict:
     # Build a lookup {customer_id: message_text}
     msg_lookup = {m["customer_id"]: m.get("message", "") for m in message_list_raw}
 
-    # Step 2: Call notification_tool via create_react_agent for each user
-    notification_agent = create_react_agent(llm, tools=[notification_tool])
-
     final_messages = []
-    notification_logs = []
 
     for user in state["recommended_users"]:
         cid = user["customer_id"]
         msg_text = msg_lookup.get(cid, f"Hi, you are pre-qualified for {user.get('recommended_offer', 'a loan')}. Reply YES to know more.")
-
-        # Build queue payload prompt for the notification_tool
-        notify_prompt = (
-            f"Queue this WhatsApp message using notification_tool.\n"
-            f"user={user['name']}, "
-            f"whatsapp_number={user.get('whatsapp_number', '')}, "
-            f"offer={user.get('recommended_offer', '')}, "
-            f"personalize_message={msg_text}"
-        )
-
-        result = notification_agent.invoke({"messages": [HumanMessage(content=notify_prompt)]})
-
-        # Extract queued payload from ToolMessage
-        tool_messages = [m for m in result["messages"] if isinstance(m, ToolMessage)]
-        queued_payload = {}
-        if tool_messages:
-            try:
-                queued_payload = json.loads(tool_messages[0].content)
-            except (json.JSONDecodeError, AttributeError):
-                queued_payload = {}
 
         final_messages.append({
             "customer_id": cid,
@@ -140,12 +114,11 @@ def message_agent_node(state: AgentPipelineState, llm) -> dict:
             "message": msg_text,
             "conversion_score": user.get("conversion_score", 0),
             "scoring_reason": user.get("scoring_reason", ""),
-            "queued": queued_payload.get("status") == "queued_stub",
+            "queued": False,
+            "queue_status": "pending_rm_approval",
         })
 
-        notification_logs.append(f"{cid}: queued={queued_payload.get('status', 'unknown')}")
-
-    log = f"Generated and queued {len(final_messages)} messages.\n" + "\n".join(notification_logs)
+    log = f"Generated {len(final_messages)} message drafts. Queue publish waits for RM approval."
 
     return {
         "messages": final_messages,
