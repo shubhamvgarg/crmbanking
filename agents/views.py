@@ -1,4 +1,5 @@
 import json
+import time
 import traceback
 
 from django.contrib import messages
@@ -18,6 +19,22 @@ from .graph.pipeline import (
     get_thread_config,
 )
 from .models import DECISION_METHODS, AgentRun, HumanReview
+
+
+def _debug_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    try:
+        with open("debug-651e1e.log", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "sessionId": "651e1e",
+                "runId": str(run_id or "")[:8],
+                "hypothesisId": hypothesis_id,
+                "location": location,
+                "message": message,
+                "data": data,
+                "timestamp": int(time.time() * 1000),
+            }) + "\n")
+    except Exception:
+        pass
 
 # ── Stage metadata ────────────────────────────────────────────────────────────
 
@@ -201,6 +218,17 @@ def continue_run(request, run_id):
     - completed/failed: show the run detail
     """
     run = get_object_or_404(AgentRun, run_id=run_id)
+    # region agent log
+    _debug_log(str(run_id), "H4", "agents/views.py:continue_run.entry", "Continue run requested", {
+        "status": run.status,
+        "current_stage": run.current_stage,
+        "batch_offset": run.batch_offset,
+        "raw_count": len(run.raw_users),
+        "scored_count": len(run.scored_users),
+        "recommended_count": len(run.recommended_users),
+        "messages_count": len(run.generated_messages),
+    })
+    # endregion
 
     if run.status == "paused":
         stage = _get_pending_review_stage(run)
@@ -377,6 +405,16 @@ def review_stage(request, run_id, stage):
         return redirect("agents:run_detail", run_id=run_id)
 
     data = getattr(run, _RUN_FIELD[stage], [])
+    # region agent log
+    _debug_log(str(run_id), "H1,H2,H4", "agents/views.py:review_stage.entry", "Review page rendered", {
+        "stage": stage,
+        "status": run.status,
+        "current_stage": run.current_stage,
+        "batch_offset": run.batch_offset,
+        "data_count": len(data),
+        "field": _RUN_FIELD[stage],
+    })
+    # endregion
     return render(request, "agents/review_stage.html", {
         "run": run,
         "stage": stage,
@@ -408,6 +446,15 @@ def submit_review(request, run_id, stage):
     """
     run = get_object_or_404(AgentRun, run_id=run_id)
     rm_user = get_authenticated_rm(request)
+    # region agent log
+    _debug_log(str(run_id), "H2,H3", "agents/views.py:submit_review.entry", "Review submit received", {
+        "stage": stage,
+        "status": run.status,
+        "current_stage": run.current_stage,
+        "batch_offset": run.batch_offset,
+        "approved_ids_count": len(request.POST.getlist("approved_ids")),
+    })
+    # endregion
 
     if stage not in _RUN_FIELD:
         messages.error(request, "Invalid stage.")
@@ -428,6 +475,14 @@ def submit_review(request, run_id, stage):
 
     approved_data = [e for e in original_data if _get_id(e) in approved_ids_raw]
     removed_ids = [_get_id(e) for e in original_data if _get_id(e) not in approved_ids_raw]
+    # region agent log
+    _debug_log(str(run_id), "H2,H3", "agents/views.py:submit_review.data_counts", "Review submit data computed", {
+        "stage": stage,
+        "original_count": len(original_data),
+        "approved_count": len(approved_data),
+        "removed_count": len(removed_ids),
+    })
+    # endregion
 
     # ── Apply RM edits for editable stages ───────────────────────────────────
     if stage == "recommendation_agent":

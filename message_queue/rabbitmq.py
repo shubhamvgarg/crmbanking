@@ -157,12 +157,43 @@ def mark_consumed(payload: dict) -> QueuedMessage | None:
     if queued:
         queued.status = "consumed"
         queued.consumed_at = timezone.now()
-        queued.save(update_fields=["status", "consumed_at", "updated_at"])
+        queued.last_error = ""
+        queued.save(update_fields=["status", "consumed_at", "last_error", "updated_at"])
 
     DeliveryLog.objects.create(
         queued_message=queued,
         event="consumed",
         detail="Consumer processed message for WhatsApp delivery.",
+        payload_snapshot=payload,
+    )
+    return queued
+
+
+def record_consume_failure(
+    payload: dict,
+    error: str,
+    *,
+    requeued: bool,
+    queued: QueuedMessage | None = None,
+) -> QueuedMessage | None:
+    """Record a failed consume attempt; keep status published when requeueing."""
+    if queued is None and payload.get("message_id"):
+        queued = QueuedMessage.objects.filter(message_id=payload["message_id"]).first()
+
+    if queued:
+        queued.retry_count += 1
+        queued.last_error = error
+        if requeued:
+            queued.status = "published"
+        else:
+            queued.status = "failed"
+        queued.save(update_fields=["status", "retry_count", "last_error", "updated_at"])
+
+    detail = f"Requeued for retry: {error}" if requeued else f"Failed permanently: {error}"
+    DeliveryLog.objects.create(
+        queued_message=queued,
+        event="consume_failed",
+        detail=detail,
         payload_snapshot=payload,
     )
     return queued

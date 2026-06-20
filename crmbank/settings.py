@@ -50,6 +50,7 @@ RABBITMQ_USE_SSL = os.getenv("RABBITMQ_USE_SSL", "True").lower() in ("true", "1"
 RABBITMQ_QUEUE = os.getenv("RABBITMQ_QUEUE", "whatsapp.messages")
 RABBITMQ_EXCHANGE = os.getenv("RABBITMQ_EXCHANGE", "crm.outreach")
 RABBITMQ_ROUTING_KEY = os.getenv("RABBITMQ_ROUTING_KEY", RABBITMQ_QUEUE)
+CONSUMER_MAX_RETRIES = int(os.getenv("CONSUMER_MAX_RETRIES", "5"))
 
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
