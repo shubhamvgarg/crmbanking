@@ -116,7 +116,7 @@
                         <td>{{ u.name }}</td>
                         <td>
                             <div class="score-bar-wrap">
-                                <div class="score-bar" style="width:{{ u.conversion_score|floatformat:2|default:'0' }}00%"></div>
+                                <div class="score-bar" data-score="{{ u.conversion_score }}"></div>
                                 <span>{{ u.conversion_score }}</span>
                             </div>
                         </td>
@@ -284,4 +284,11 @@
     {% endif %}
 
 </section>
+<script>
+document.querySelectorAll('.score-bar[data-score]').forEach((bar) => {
+  const raw = parseFloat(bar.dataset.score || '0');
+  const percentage = raw <= 1 ? raw * 100 : raw;
+  bar.style.width = Math.max(0, Math.min(100, percentage)) + '%';
+});
+</script>
 {% endblock %}
