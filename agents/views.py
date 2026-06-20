@@ -1,5 +1,4 @@
 import json
-import time
 import traceback
 
 from django.contrib import messages
@@ -19,22 +18,6 @@ from .graph.pipeline import (
     get_thread_config,
 )
 from .models import DECISION_METHODS, AgentRun, HumanReview
-
-
-def _debug_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict) -> None:
-    try:
-        with open("debug-651e1e.log", "a", encoding="utf-8") as fh:
-            fh.write(json.dumps({
-                "sessionId": "651e1e",
-                "runId": str(run_id or "")[:8],
-                "hypothesisId": hypothesis_id,
-                "location": location,
-                "message": message,
-                "data": data,
-                "timestamp": int(time.time() * 1000),
-            }) + "\n")
-    except Exception:
-        pass
 
 # ── Stage metadata ────────────────────────────────────────────────────────────
 
@@ -394,15 +377,6 @@ def review_stage(request, run_id, stage):
         return redirect("agents:run_detail", run_id=run_id)
 
     data = getattr(run, _RUN_FIELD[stage], [])
-    # region agent log
-    _debug_log(str(run_id), "H1,H2,H3,H4", "agents/views.py:review_stage.entry", "Rendering review_stage", {
-        "stage": stage,
-        "data_count": len(data),
-        "conversion_score_sample": [type(item.get("conversion_score")).__name__ for item in data[:5]],
-        "conversion_score_values_sample": [item.get("conversion_score") for item in data[:5]],
-        "decision_method_sample": [item.get("decision_method") for item in data[:5]],
-    })
-    # endregion
     return render(request, "agents/review_stage.html", {
         "run": run,
         "stage": stage,

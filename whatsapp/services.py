@@ -106,3 +106,43 @@ def update_delivery_from_webhook(data: dict) -> WhatsAppDelivery | None:
         "sent_at", "delivered_at", "failed_at", "updated_at",
     ])
     return delivery
+
+
+def sync_pending_delivery_statuses(limit: int = 50) -> int:
+    """
+    Fallback status sync for local demos where webhook callbacks are unavailable.
+    Pulls latest status from Twilio for queued/sent records.
+    Returns number of records updated.
+    """
+    _require_twilio_settings()
+    client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+    pending = list(
+        WhatsAppDelivery.objects
+        .filter(status__in=["queued", "sent"])
+        .order_by("-created_at")[:limit]
+    )
+    updated = 0
+    for delivery in pending:
+        try:
+            remote = client.messages(delivery.message_sid).fetch()
+            remote_status = (remote.status or delivery.status or "").lower()
+            if remote_status and remote_status != delivery.status:
+                delivery.status = remote_status
+                if remote_status == "delivered":
+                    delivery.delivered_at = timezone.now()
+                elif remote_status in ("failed", "undelivered"):
+                    delivery.failed_at = timezone.now()
+                elif remote_status == "sent" and not delivery.sent_at:
+                    delivery.sent_at = timezone.now()
+                if getattr(remote, "error_code", None):
+                    delivery.error_code = str(remote.error_code)
+                if getattr(remote, "error_message", None):
+                    delivery.error_message = str(remote.error_message)
+                delivery.save(update_fields=[
+                    "status", "sent_at", "delivered_at", "failed_at",
+                    "error_code", "error_message", "updated_at",
+                ])
+                updated += 1
+        except Exception:
+            continue
+    return updated

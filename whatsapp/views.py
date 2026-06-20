@@ -6,7 +6,7 @@ from django.views.decorators.http import require_GET, require_POST
 from rm_auth.decorators import rm_login_required
 
 from .models import WhatsAppDelivery
-from .services import update_delivery_from_webhook
+from .services import sync_pending_delivery_statuses, update_delivery_from_webhook
 
 
 @csrf_exempt
@@ -23,6 +23,11 @@ def status_webhook(request):
 @rm_login_required
 @require_GET
 def delivery_log(request):
+    try:
+        sync_pending_delivery_statuses(limit=100)
+    except Exception:
+        pass
+
     deliveries = (
         WhatsAppDelivery.objects
         .select_related("queued_message", "queued_message__run")
